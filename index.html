@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tontechnikplan</title>
+  <meta name="description" content="Technikerdienst-Plan erstellen, besetzen und drucken">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M9 7v18M16 7v18M23 7v18' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Crect x='6' y='17' width='6' height='4' rx='1' fill='%23fff'/%3E%3Crect x='13' y='10' width='6' height='4' rx='1' fill='%23fff'/%3E%3Crect x='20' y='14' width='6' height='4' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="mode-view">
+  <header class="topbar no-print">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Tontechnikplan</span>
+      <span class="mode-chip edit-only">Bearbeitungsmodus</span>
+    </div>
+    <nav class="month-nav" aria-label="Monat wählen">
+      <button type="button" class="icon-btn" id="prevMonth" title="Vorheriger Monat" aria-label="Vorheriger Monat">‹</button>
+      <select id="monthSel" aria-label="Monat"></select>
+      <select id="yearSel" aria-label="Jahr"></select>
+      <button type="button" class="icon-btn" id="nextMonth" title="Nächster Monat" aria-label="Nächster Monat">›</button>
+    </nav>
+    <div class="top-actions">
+      <span class="sync" id="syncInfo"></span>
+      <button type="button" class="btn" id="statsBtn">📊 Statistik</button>
+      <button type="button" class="btn" id="copyText" title="Ganzen Monatsplan als Text kopieren, z. B. für die Gruppe">Plan als Text</button>
+      <button type="button" class="btn" id="printBtn">Drucken / PDF</button>
+      <button type="button" class="btn btn-primary view-only" id="enterEdit">✎ Bearbeiten</button>
+      <button type="button" class="btn btn-primary edit-only" id="leaveEdit">✓ Fertig</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="sheet-col">
+      <div class="toolbar no-print edit-only">
+        <button type="button" class="btn btn-primary" id="randomPlan" title="Ganzen Monat zufällig und fair besetzen (bei leerem Monat werden die Regeltermine automatisch angelegt)">🎲 Zufallsplan</button>
+        <button type="button" class="btn" id="addEvent">+ Ereignis</button>
+        <button type="button" class="btn" id="genRegular" title="Wiederkehrende Termine für diesen Monat einfügen">Regeltermine einfügen</button>
+        <button type="button" class="btn" id="autoAssign" title="Offene Plätze fair verteilen">Automatisch besetzen</button>
+        <button type="button" class="btn btn-ghost" id="undoBtn" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
+        <details class="menu">
+          <summary class="btn btn-ghost">Mehr ▾</summary>
+          <div class="menu-pop">
+            <button type="button" id="clearPeople">Besetzung dieses Monats leeren</button>
+            <button type="button" id="reshuffle">Komplett neu verteilen (alle Plätze)</button>
+            <button type="button" id="clearMonth" class="danger">Alle Termine dieses Monats löschen</button>
+          </div>
+        </details>
+        <span class="status" id="statusInfo"></span>
+      </div>
+
+      <div class="paper-scroll">
+        <div class="paper" id="sheet"></div>
+      </div>
+
+      <div id="warnings" class="warnings no-print edit-only"></div>
+      <div id="changeLog" class="change-log no-print"></div>
+    </section>
+
+    <section id="statsPage" class="stats-page no-print" hidden></section>
+
+    <aside class="mine no-print view-only">
+      <div class="mine-card">
+        <h2>Wann bin ich dran?</h2>
+        <label class="field"><span>Ich bin</span><select id="meSel"></select></label>
+        <div id="myDuties"></div>
+        <div id="myCal" class="my-cal"></div>
+      </div>
+      <p class="hint mine-foot" id="lastUpdate"></p>
+    </aside>
+
+    <aside class="panel no-print edit-only">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab active" data-tab="people">Personen</button>
+        <button type="button" role="tab" class="tab" data-tab="rules">Verfügbarkeit</button>
+        <button type="button" role="tab" class="tab" data-tab="templates">Termine</button>
+        <button type="button" role="tab" class="tab" data-tab="settings">Einstellungen</button>
+      </div>
+
+      <div class="tab-panel" data-panel="people">
+        <div class="panel-head">
+          <h2>Personen</h2>
+          <button type="button" class="btn btn-sm" id="addPerson">+ Person</button>
+        </div>
+        <p class="hint">Einsätze im gewählten Monat. Klick auf einen Namen hebt seine Dienste im Plan hervor.</p>
+        <ul class="people-list" id="peopleList"></ul>
+      </div>
+
+      <div class="tab-panel" data-panel="rules" hidden>
+        <h2>Wer kann wann nicht?</h2>
+        <p class="hint">Diese Regeln beachtet der Zufallsplan und „Automatisch besetzen“. Trägt man jemanden trotzdem von Hand ein, wird es im Plan rot markiert.</p>
+        <div class="rule-form">
+          <label class="field"><span>Person</span><select id="rfPerson"></select></label>
+          <fieldset class="field">
+            <legend>Art</legend>
+            <div class="seg">
+              <label><input type="radio" name="rfType" value="weekday" checked><span>Wochentag</span></label>
+              <label><input type="radio" name="rfType" value="dates"><span>Datum / Zeitraum</span></label>
+            </div>
+          </fieldset>
+          <div id="rfWeekdayFields">
+            <div class="grid2">
+              <label class="field"><span>Kann nicht am</span><select id="rfWeekday"></select></label>
+              <label class="field"><span>Uhrzeit</span><select id="rfTime"></select></label>
+            </div>
+            <label class="field"><span>Gültig</span><select id="rfMonth"></select></label>
+          </div>
+          <div id="rfDateFields" class="grid2" hidden>
+            <label class="field"><span>Von</span><input type="date" id="rfFrom"></label>
+            <label class="field"><span>Bis</span><input type="date" id="rfTo"></label>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="rfAdd">Regel hinzufügen</button>
+        </div>
+        <h2 class="mt">Gültig im <span id="rfMonthName"></span></h2>
+        <ul class="rule-list" id="ruleList"></ul>
+        <details class="rule-other" id="ruleOtherWrap">
+          <summary>Weitere Regeln (andere Monate)</summary>
+          <ul class="rule-list" id="ruleOtherList"></ul>
+        </details>
+      </div>
+
+      <div class="tab-panel" data-panel="templates" hidden>
+        <div class="panel-head">
+          <h2>Regeltermine</h2>
+          <button type="button" class="btn btn-sm" id="addTemplate">+ Regeltermin</button>
+        </div>
+        <p class="hint">Diese Termine werden mit „Regeltermine einfügen“ automatisch in einen Monat übernommen. Bereits vorhandene Termine zur gleichen Zeit (z. B. eine Hochzeit am Samstag 19:00) werden nicht überschrieben.</p>
+        <ul class="tpl-list" id="templateList"></ul>
+      </div>
+
+      <div class="tab-panel" data-panel="settings" hidden>
+        <h2>Darstellung</h2>
+        <label class="field"><span>Überschrift</span><input type="text" data-setting="title"></label>
+        <div class="grid2">
+          <label class="field"><span>1. Personenspalte</span><input type="text" data-setting="col1"></label>
+          <label class="field"><span>2. Personenspalte</span><input type="text" data-setting="col2"></label>
+        </div>
+        <label class="field"><span>Hinweiszeile</span><textarea rows="2" data-setting="note"></textarea></label>
+        <label class="field"><span>Leerzeile zwischen Wochen</span>
+          <select data-setting="weekSplit">
+            <option value="afterSunday">nach dem Sonntag (Woche Mo–So)</option>
+            <option value="beforeSunday">vor dem Sonntag (Woche So–Sa)</option>
+            <option value="none">keine Leerzeilen</option>
+          </select>
+        </label>
+        <label class="field"><span>Dienste mit 1 Person</span>
+          <select data-setting="singleMode">
+            <option value="merged">über beide Spalten (zusammengefasst)</option>
+            <option value="col2">nur in der 2. Spalte (Mischpult)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" data-setting="showYear"> Jahr in der Überschrift anzeigen</label>
+
+        <h2 class="mt">Server</h2>
+        <p class="hint" id="cloudInfo"></p>
+        <div class="btn-row" id="logoutRow" hidden>
+          <button type="button" class="btn btn-sm" id="logoutBtn">Auf diesem Gerät abmelden</button>
+        </div>
+
+        <h2 class="mt">Daten</h2>
+        <p class="hint">Alle Daten werden in diesem Browser gespeichert. Um den Plan auf einem anderen Gerät oder mit anderen zu teilen, eine Sicherung exportieren und dort importieren.</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-sm" id="exportJson">Sicherung exportieren</button>
+          <label class="btn btn-sm file-btn">Sicherung importieren<input type="file" id="importJson" accept="application/json,.json"></label>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-sm btn-danger-ghost" id="resetAll">Alles auf Ausgangsdaten zurücksetzen</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Ereignis -->
+  <dialog id="eventDialog" class="dlg">
+    <form id="eventForm" novalidate>
+      <header class="dlg-head">
+        <h2 id="eventDialogTitle">Ereignis</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Schließen">×</button>
+      </header>
+      <div class="dlg-body">
+        <div class="field">
+          <span>Schnellauswahl</span>
+          <div class="chips" id="quickChips"></div>
+        </div>
+        <div class="grid2">
+          <label class="field"><span>Datum</span><input type="date" id="evDate" required></label>
+          <label class="field"><span>Uhrzeit</span><input type="time" id="evTime" required></label>
+        </div>
+        <label class="field"><span>Bemerkung / Anlass</span>
+          <input type="text" id="evTitle" list="titleList" required placeholder="z. B. Gottesdienst, Hochzeit …" autocomplete="off">
+        </label>
+        <datalist id="titleList"></datalist>
+        <fieldset class="field">
+          <legend>Besetzung</legend>
+          <div class="seg">
+            <label><input type="radio" name="evSlots" value="2"><span>2 Personen</span></label>
+            <label><input type="radio" name="evSlots" value="1"><span>1 Person</span></label>
+          </div>
+        </fieldset>
+        <div class="grid2">
+          <label class="field" id="evP0Wrap"><span id="evP0Label">Studio</span><select id="evP0"></select></label>
+          <label class="field" id="evP1Wrap"><span id="evP1Label">Mischpult</span><select id="evP1"></select></label>
+        </div>
+        <p class="dlg-warn" id="evWarn"></p>
+        <fieldset class="field">
+          <legend>Zeilenfarbe</legend>
+          <div class="swatches" id="evColors"></div>
+        </fieldset>
+      </div>
+      <footer class="dlg-foot">
+        <button type="button" class="btn btn-danger-ghost" id="evDelete">Löschen</button>
+        <span class="grow"></span>
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Person -->
+  <dialog id="personDialog" class="dlg">
+    <form id="personForm" novalidate>
+      <header class="dlg-head">
+        <h2 id="personDialogTitle">Person</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Schließen">×</button>
+      </header>
+      <div class="dlg-body">
+        <label class="field"><span>Name (wie im Plan, z. B. „J.Koop“)</span><input type="text" id="psName" required autocomplete="off"></label>
+        <fieldset class="field">
+          <legend>Kann eingeteilt werden für</legend>
+          <label class="check"><input type="checkbox" id="psStudio"> <span id="psStudioLabel">Studio</span></label>
+          <label class="check"><input type="checkbox" id="psMischpult"> <span id="psMischpultLabel">Mischpult</span> (auch Dienste mit 1 Person)</label>
+          <label class="check"><input type="checkbox" id="psRussisch"> Russisch-Dienste (Bemerkung enthält „Russisch“)</label>
+        </fieldset>
+        <label class="check"><input type="checkbox" id="psActive"> Aktiv (bei Auswahl und automatischer Besetzung berücksichtigen)</label>
+        <fieldset class="field">
+          <legend>Kann regelmäßig nicht</legend>
+          <div id="psRules" class="rules-edit"></div>
+          <button type="button" class="btn btn-sm" id="psAddRule">+ Wochentag-Regel</button>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Abwesenheiten (Datum / Zeitraum)</legend>
+          <div id="psAbsences" class="absences"></div>
+          <button type="button" class="btn btn-sm" id="psAddAbsence">+ Abwesenheit</button>
+        </fieldset>
+      </div>
+      <footer class="dlg-foot">
+        <button type="button" class="btn btn-danger-ghost" id="psDelete">Entfernen</button>
+        <span class="grow"></span>
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Regeltermin -->
+  <dialog id="templateDialog" class="dlg">
+    <form id="templateForm" novalidate>
+      <header class="dlg-head">
+        <h2 id="templateDialogTitle">Regeltermin</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Schließen">×</button>
+      </header>
+      <div class="dlg-body">
+        <div class="grid2">
+          <label class="field"><span>Wochentag</span><select id="tpWeekday"></select></label>
+          <label class="field"><span>Uhrzeit</span><input type="time" id="tpTime" required></label>
+        </div>
+        <label class="field"><span>Bemerkung / Anlass</span><input type="text" id="tpTitle" required autocomplete="off"></label>
+        <fieldset class="field">
+          <legend>Besetzung</legend>
+          <div class="seg">
+            <label><input type="radio" name="tpSlots" value="2"><span>2 Personen</span></label>
+            <label><input type="radio" name="tpSlots" value="1"><span>1 Person</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="field">
+          <legend>In welcher Woche des Monats?</legend>
+          <div class="weeks" id="tpWeeks"></div>
+          <p class="hint">Nichts ausgewählt = jede Woche.</p>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Zeilenfarbe</legend>
+          <div class="swatches" id="tpColors"></div>
+        </fieldset>
+      </div>
+      <footer class="dlg-foot">
+        <button type="button" class="btn btn-danger-ghost" id="tpDelete">Löschen</button>
+        <span class="grow"></span>
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Anmeldung für den Bearbeitungsmodus -->
+  <dialog id="loginDialog" class="dlg dlg-sm">
+    <form id="loginForm" novalidate>
+      <header class="dlg-head">
+        <h2>Bearbeiten freischalten</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Schließen">×</button>
+      </header>
+      <div class="dlg-body">
+        <p class="hint">Bitte das Team-Passwort eingeben. Auf diesem Gerät bleibst du danach angemeldet.</p>
+        <label class="field"><span>Passwort</span><input type="password" id="loginPw" autocomplete="current-password" required></label>
+        <p class="dlg-warn" id="loginErr"></p>
+      </div>
+      <footer class="dlg-foot">
+        <span class="grow"></span>
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary" id="loginSubmit">Freischalten</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Änderung: Text für die Gruppe -->
+  <dialog id="changeDialog" class="dlg">
+    <div class="dlg-wrap">
+      <header class="dlg-head">
+        <h2 id="changeTitle">Änderung</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Schließen">×</button>
+      </header>
+      <div class="dlg-body">
+        <p class="change-intro" id="changeIntro"></p>
+        <textarea id="changeText" class="change-text" rows="5" aria-label="Text für die Gruppe"></textarea>
+        <p class="hint">Der Text steht auch unter „Letzte Änderungen“ unter dem Plan.</p>
+      </div>
+      <footer class="dlg-foot">
+        <span class="grow"></span>
+        <button type="button" class="btn" data-close>Schließen</button>
+        <button type="button" class="btn btn-primary" id="changeCopy">📋 Text kopieren</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <div id="vizTip" class="viz-tip" role="tooltip" hidden></div>
+  <div id="toast" class="toast no-print" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
