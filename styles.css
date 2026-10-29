@@ -431,11 +431,14 @@ tr.ev:hover .row-actions,
 .tpl-item .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
 .tpl-item strong { font-weight: 600; }
 .tpl-item .meta { display: block; font-size: 12px; color: var(--muted); }
+.tpl-group { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tpl-group:first-child { margin-top: 0; }
+.day-month { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px; }
 
 /* ---------- Formulare ---------- */
 .field { display: grid; gap: 4px; margin: 0 0 12px; border: 0; padding: 0; min-width: 0; }
 .field > span, .field > legend { font-size: 12.5px; font-weight: 600; color: #3b4652; padding: 0; margin-bottom: 4px; }
-.field input[type=text], .field input[type=date], .field input[type=time], .field select, .field textarea {
+.field input[type=text], .field input[type=date], .field input[type=time], .field input[type=number], .field select, .field textarea {
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;

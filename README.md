@@ -46,6 +46,11 @@ HTTPS wird dringend empfohlen (z. B. mit Let's Encrypt), da das Passwort übertr
 - Beim Klick auf **✓ Fertig** fasst die Seite alle Änderungen an bereits geplanten Diensten zusammen
   (umbesetzt, verlegt, gestrichen, neu) und zeigt den Text für die Gruppe. Ein komplett neu erstellter Monat zählt nicht als Änderung.
 - Einträge unter „Letzte Änderungen“ lassen sich im Bearbeitungsmodus mit × entfernen.
+- **Jährliche Regeltermine** (Tab „Termine“ → Regeltermin → Wiederholung): *Festes Datum* (z. B. Heiligabend 24.12. 16:00,
+  Weihnachten 25.12. 10:00 – beide sind voreingestellt) oder *Ostern* (Karfreitag, Ostermontag, Himmelfahrt, Pfingsten …,
+  das Datum wird jedes Jahr berechnet). Sie werden mit „Regeltermine einfügen“ / Zufallsplan vor den wöchentlichen Terminen
+  angelegt und haben zur gleichen Uhrzeit Vorrang. Mit „Ersetzt die anderen Regeltermine an diesem Tag“ entfallen an dem Tag
+  alle wöchentlichen Termine. Bereits angelegte Termine eines Monats werden nicht verändert.
 
 ## Daten & Sicherung
 

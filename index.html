@@ -261,10 +261,27 @@
         <button type="button" class="icon-btn" data-close aria-label="Schließen">×</button>
       </header>
       <div class="dlg-body">
+        <fieldset class="field">
+          <legend>Wiederholung</legend>
+          <div class="seg">
+            <label><input type="radio" name="tpType" value="weekly"><span>Wöchentlich</span></label>
+            <label><input type="radio" name="tpType" value="date"><span>Festes Datum</span></label>
+            <label><input type="radio" name="tpType" value="easter"><span>Ostern</span></label>
+          </div>
+        </fieldset>
         <div class="grid2">
-          <label class="field"><span>Wochentag</span><select id="tpWeekday"></select></label>
+          <label class="field" id="tpWeekdayWrap"><span>Wochentag</span><select id="tpWeekday"></select></label>
+          <div class="field" id="tpDateWrap" hidden>
+            <span>Datum (jedes Jahr)</span>
+            <div class="day-month">
+              <input type="number" id="tpDay" min="1" max="31" step="1" aria-label="Tag">
+              <select id="tpMonth" aria-label="Monat"></select>
+            </div>
+          </div>
+          <label class="field" id="tpEasterWrap" hidden><span>Tag (jedes Jahr)</span><select id="tpEasterPreset"></select></label>
           <label class="field"><span>Uhrzeit</span><input type="time" id="tpTime" required></label>
         </div>
+        <label class="field" id="tpOffsetWrap" hidden><span>Tage ab Ostersonntag (negativ = davor)</span><input type="number" id="tpOffset" step="1"></label>
         <label class="field"><span>Bemerkung / Anlass</span><input type="text" id="tpTitle" required autocomplete="off"></label>
         <fieldset class="field">
           <legend>Besetzung</legend>
@@ -273,11 +290,12 @@
             <label><input type="radio" name="tpSlots" value="1"><span>1 Person</span></label>
           </div>
         </fieldset>
-        <fieldset class="field">
+        <fieldset class="field" id="tpWeeksWrap">
           <legend>In welcher Woche des Monats?</legend>
           <div class="weeks" id="tpWeeks"></div>
           <p class="hint">Nichts ausgewählt = jede Woche.</p>
         </fieldset>
+        <label class="check" id="tpReplacesWrap" hidden><input type="checkbox" id="tpReplaces"> <span>Ersetzt die anderen Regeltermine an diesem Tag</span></label>
         <fieldset class="field">
           <legend>Zeilenfarbe</legend>
           <div class="swatches" id="tpColors"></div>

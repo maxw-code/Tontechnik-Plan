@@ -32,8 +32,13 @@ const QUICK_EVENTS = [
   { title: 'Beerdigung', slots: 2, color: 'grau' },
   { title: 'Jugendstunde', slots: 1, color: 'none' },
   { title: 'Konzert', slots: 2, color: 'gruen' },
-  { title: 'Weihnachten', slots: 2, color: 'blau' },
   { title: 'Gemeindestunde', slots: 1, color: 'blau' },
+];
+
+// Jährliche Regeltermine relativ zu Ostern: Abstand in Tagen zum Ostersonntag
+const EASTER_PRESETS = [
+  [-2, 'Karfreitag'], [0, 'Ostersonntag'], [1, 'Ostermontag'],
+  [39, 'Himmelfahrt'], [49, 'Pfingstsonntag'], [50, 'Pfingstmontag'],
 ];
 
 const DEFAULT_SETTINGS = {
@@ -91,15 +96,60 @@ function weekKey(date, mode) {
   return mode === 'beforeSunday' ? Math.floor((n + 4) / 7) : Math.floor((n + 3) / 7);
 }
 
+// Ostersonntag (westlich, gregorianischer Kalender) nach Meeus/Jones/Butcher
+function easterSunday(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const n = h + l - 7 * m + 114;
+  return isoDate(y, Math.floor(n / 31) - 1, (n % 31) + 1);
+}
+
+const validDayMonth = (day, month, y = 2024) => Number.isInteger(day) && day >= 1 && new Date(y, month - 1, day).getMonth() === month - 1;
+
+// Datum eines jährlichen Regeltermins im Jahr y (null, wenn es ihn dort nicht gibt, z. B. 29.2.)
+function yearlyDate(t, y) {
+  if (t.type === 'date') return validDayMonth(t.day, t.month, y) ? isoDate(y, t.month - 1, t.day) : null;
+  if (t.type === 'easter') return shiftIso(easterSunday(y), { days: t.offset });
+  return null;
+}
+
+function nextYearlyDate(t, from = todayIso()) {
+  const y = parseDate(from).getFullYear();
+  for (let i = 0; i <= 8; i++) {
+    const d = yearlyDate(t, y + i);
+    if (d && d >= from) return d;
+  }
+  return null;
+}
+
+function describeYearly(t) {
+  if (t.type === 'date') return `${t.day}.${t.month}.`;
+  const preset = EASTER_PRESETS.find(([o]) => o === t.offset);
+  if (preset) return preset[1];
+  return `Ostersonntag ${t.offset < 0 ? '−' : '+'}${Math.abs(t.offset)} Tage`;
+}
+
 /* ---------- Ausgangsdaten: Personen und Regeltermine (ohne Termine) ---------- */
 function defaultTemplates() {
   return [
-    { id: uid(), weekday: 3, time: '19:00', title: 'Bibelstunde', slots: 1, color: 'none', weeks: [] },
-    { id: uid(), weekday: 6, time: '19:00', title: 'Gebetsstunde', slots: 2, color: 'none', weeks: [] },
-    { id: uid(), weekday: 0, time: '10:00', title: 'Gottesdienst', slots: 2, color: 'blau', weeks: [] },
-    { id: uid(), weekday: 0, time: '17:00', title: 'Abendmahl', slots: 1, color: 'blau', weeks: ['1'] },
-    { id: uid(), weekday: 0, time: '17:00', title: 'Russisch', slots: 1, color: 'gelb', weeks: ['3'] },
-    { id: uid(), weekday: 0, time: '17:00', title: 'Gemeindestunde', slots: 1, color: 'blau', weeks: ['last'] },
+    { id: uid(), type: 'weekly', weekday: 3, time: '19:00', title: 'Bibelstunde', slots: 1, color: 'none', weeks: [] },
+    { id: uid(), type: 'weekly', weekday: 6, time: '19:00', title: 'Gebetsstunde', slots: 2, color: 'none', weeks: [] },
+    { id: uid(), type: 'weekly', weekday: 0, time: '10:00', title: 'Gottesdienst', slots: 2, color: 'blau', weeks: [] },
+    { id: uid(), type: 'weekly', weekday: 0, time: '17:00', title: 'Abendmahl', slots: 1, color: 'blau', weeks: ['1'] },
+    { id: uid(), type: 'weekly', weekday: 0, time: '17:00', title: 'Russisch', slots: 1, color: 'gelb', weeks: ['3'] },
+    { id: uid(), type: 'weekly', weekday: 0, time: '17:00', title: 'Gemeindestunde', slots: 1, color: 'blau', weeks: ['last'] },
+    ...christmasTemplates(),
+  ];
+}
+
+function christmasTemplates() {
+  return [
+    { id: uid(), type: 'date', month: 12, day: 24, time: '16:00', title: 'Heiligabend', slots: 2, color: 'blau', weeks: [], replacesDay: false },
+    { id: uid(), type: 'date', month: 12, day: 25, time: '10:00', title: 'Weihnachten', slots: 2, color: 'blau', weeks: [], replacesDay: false },
   ];
 }
 
@@ -109,7 +159,7 @@ function seedState() {
     ['mk', 'M.Koop'], ['vg', 'V.Gorin', true], ['pk', 'P.Koop'], ['dk', 'D.Kazancev', true],
   ].map(([id, name, ru]) => ({ id, name, active: true, studio: true, mischpult: true, russisch: !!ru, absences: [], rules: [] }));
 
-  return { version: 2, settings: { ...DEFAULT_SETTINGS }, people, templates: defaultTemplates(), events: [], log: [] };
+  return { version: 3, settings: { ...DEFAULT_SETTINGS }, people, templates: defaultTemplates(), events: [], log: [] };
 }
 
 /* ---------- Zustand & Speicherung ---------- */
@@ -122,9 +172,18 @@ function normalize(s) {
     q.rules = (p.rules || []).map(r => ({ time: '', month: '', ...r, weekday: Number(r.weekday), id: r.id || uid() }));
     return q;
   });
-  s.templates = Array.isArray(s.templates) ? s.templates.map(t => ({ slots: 2, color: 'none', weeks: [], ...t, id: t.id || uid() })) : defaultTemplates();
+  s.templates = Array.isArray(s.templates)
+    ? s.templates.map(t => ({ type: 'weekly', slots: 2, color: 'none', weeks: [], replacesDay: false, ...t, id: t.id || uid() }))
+    : defaultTemplates();
   // Version 1 enthielt nur Beispielpläne (Aug.–Nov. 2026): diese einmalig entfernen
   if (!(s.version >= 2)) { s.events = []; s.log = []; s.version = 2; }
+  // Version 3: jährliche Regeltermine – Heiligabend und Weihnachten einmalig ergänzen
+  if (s.version < 3) {
+    for (const t of christmasTemplates()) {
+      if (!s.templates.some(x => x.title.toLowerCase() === t.title.toLowerCase())) s.templates.push(t);
+    }
+    s.version = 3;
+  }
   delete s.notices;
   s.log = Array.isArray(s.log) ? s.log.filter(l => l && l.text) : [];
   s.events = s.events.map(e => {
@@ -136,7 +195,7 @@ function normalize(s) {
 }
 
 function emptyState() {
-  return { version: 2, settings: { ...DEFAULT_SETTINGS }, people: [], templates: defaultTemplates(), events: [], log: [] };
+  return { version: 3, settings: { ...DEFAULT_SETTINGS }, people: [], templates: defaultTemplates(), events: [], log: [] };
 }
 
 function loadState() {
@@ -1011,14 +1070,25 @@ function describeWeeks(t) {
 }
 
 function renderTemplates() {
-  const order = t => ((t.weekday + 6) % 7) * 10000 + Number(t.time.replace(':', ''));
-  const list = [...state.templates].sort((a, b) => order(a) - order(b));
-  $('#templateList').innerHTML = list.map(t =>
+  const item = (t, head, meta) =>
     `<li class="tpl-item"><span class="sw" style="background:${colorBg(t.color)}"></span>` +
-    `<div><strong>${WD[t.weekday]} ${esc(t.time)} · ${esc(t.title)}</strong>` +
-    `<span class="meta">${t.slots === 1 ? '1 Person' : '2 Personen'} · ${esc(describeWeeks(t))}</span></div>` +
-    `<button type="button" class="icon-btn" data-edit-tpl="${esc(t.id)}" title="Bearbeiten" aria-label="Bearbeiten" style="font-size:16px">✎</button></li>`
-  ).join('') || '<li class="hint">Keine Regeltermine.</li>';
+    `<div><strong>${esc(head)}</strong>` +
+    `<span class="meta">${t.slots === 1 ? '1 Person' : '2 Personen'} · ${esc(meta)}</span></div>` +
+    `<button type="button" class="icon-btn" data-edit-tpl="${esc(t.id)}" title="Bearbeiten" aria-label="Bearbeiten" style="font-size:16px">✎</button></li>`;
+
+  const order = t => ((t.weekday + 6) % 7) * 10000 + Number(t.time.replace(':', ''));
+  const weekly = state.templates.filter(t => t.type === 'weekly').sort((a, b) => order(a) - order(b));
+  const yearly = state.templates.filter(t => t.type !== 'weekly')
+    .map(t => ({ t, next: nextYearlyDate(t) }))
+    .sort((a, b) => (a.next || '9999').localeCompare(b.next || '9999') || a.t.time.localeCompare(b.t.time));
+
+  let html = weekly.map(t => item(t, `${WD[t.weekday]} ${t.time} · ${t.title}`, describeWeeks(t))).join('');
+  if (yearly.length) {
+    if (weekly.length) html = '<li class="tpl-group">Wöchentlich</li>' + html;
+    html += '<li class="tpl-group">Jährlich</li>' + yearly.map(({ t, next }) => item(t, `${describeYearly(t)} ${t.time} · ${t.title}`,
+      `jährlich${next ? ` · nächstes Mal ${WD[weekdayOf(next)]} ${fmtLong(next)}` : ''}${t.replacesDay ? ' · ersetzt den Tag' : ''}`)).join('');
+  }
+  $('#templateList').innerHTML = html || '<li class="hint">Keine Regeltermine.</li>';
 }
 
 /* ---------- Rendering: Verfügbarkeit ---------- */
@@ -1125,17 +1195,31 @@ function fillSettings() {
 function buildRegularEvents(y, m) {
   const dim = new Date(y, m + 1, 0).getDate();
   const added = [];
+  const add = (t, date) => {
+    const exists = state.events.some(e => e.date === date && e.time === t.time) || added.some(e => e.date === date && e.time === t.time);
+    if (!exists) added.push({ id: uid(), date, time: t.time, title: t.title, color: t.color, slots: t.slots, people: Array(t.slots).fill(null) });
+  };
+
+  // Jährliche Termine zuerst: sie haben Vorrang vor wöchentlichen zur gleichen Uhrzeit
+  const replacedDays = new Set();
+  for (const t of state.templates) {
+    if (t.type === 'weekly') continue;
+    const date = yearlyDate(t, y);
+    if (!date || !date.startsWith(monthPrefix(y, m))) continue;
+    if (t.replacesDay) replacedDays.add(date);
+    add(t, date);
+  }
+
   for (let d = 1; d <= dim; d++) {
+    const date = isoDate(y, m, d);
+    if (replacedDays.has(date)) continue;
     const wd = new Date(y, m, d).getDay();
     const nth = String(Math.ceil(d / 7));
     const isLast = d + 7 > dim;
     for (const t of state.templates) {
-      if (Number(t.weekday) !== wd) continue;
+      if (t.type !== 'weekly' || Number(t.weekday) !== wd) continue;
       if (t.weeks.length && !(t.weeks.includes(nth) || (isLast && t.weeks.includes('last')))) continue;
-      const date = isoDate(y, m, d);
-      const exists = state.events.some(e => e.date === date && e.time === t.time) || added.some(e => e.date === date && e.time === t.time);
-      if (exists) continue;
-      added.push({ id: uid(), date, time: t.time, title: t.title, color: t.color, slots: t.slots, people: Array(t.slots).fill(null) });
+      add(t, date);
     }
   }
   return added;
@@ -1517,17 +1601,34 @@ let editingTemplateId = null;
 function openTemplateDialog(id = null) {
   const t = id ? state.templates.find(x => x.id === id) : null;
   editingTemplateId = t ? t.id : null;
-  const d = t || { weekday: 0, time: '10:00', title: '', slots: 2, color: 'none', weeks: [] };
+  const d = { type: 'weekly', weekday: 0, weeks: [], day: 25, month: 12, offset: 0, replacesDay: false, time: '10:00', title: '', slots: 2, color: 'none', ...t };
   $('#templateDialogTitle').textContent = t ? 'Regeltermin bearbeiten' : 'Neuer Regeltermin';
+  setRadio('tpType', d.type);
   $('#tpWeekday').value = String(d.weekday);
+  $('#tpDay').value = d.day;
+  $('#tpMonth').value = String(d.month);
+  $('#tpEasterPreset').value = EASTER_PRESETS.some(([o]) => o === d.offset) ? String(d.offset) : 'custom';
+  $('#tpOffset').value = d.offset;
+  $('#tpReplaces').checked = !!d.replacesDay;
   $('#tpTime').value = d.time;
   $('#tpTitle').value = d.title;
   setRadio('tpSlots', d.slots);
   setRadio('tpColor', d.color);
   $$('#tpWeeks input').forEach(i => { i.checked = d.weeks.includes(i.value); });
+  refreshTemplateFields();
   $('#tpDelete').hidden = !t;
   $('#templateDialog').showModal();
   $('#tpTitle').focus();
+}
+
+function refreshTemplateFields() {
+  const type = $('input[name=tpType]:checked')?.value || 'weekly';
+  $('#tpWeekdayWrap').hidden = type !== 'weekly';
+  $('#tpWeeksWrap').hidden = type !== 'weekly';
+  $('#tpDateWrap').hidden = type !== 'date';
+  $('#tpEasterWrap').hidden = type !== 'easter';
+  $('#tpOffsetWrap').hidden = type !== 'easter' || $('#tpEasterPreset').value !== 'custom';
+  $('#tpReplacesWrap').hidden = type === 'weekly';
 }
 
 function saveTemplateDialog(ev) {
@@ -1535,17 +1636,34 @@ function saveTemplateDialog(ev) {
   const title = $('#tpTitle').value.trim();
   const time = $('#tpTime').value;
   if (!title || !time) { toast('Bitte Uhrzeit und Bemerkung ausfüllen.'); return; }
+  const type = $('input[name=tpType]:checked')?.value || 'weekly';
   const data = {
-    weekday: Number($('#tpWeekday').value),
+    type,
     time,
     title,
     slots: Number($('input[name=tpSlots]:checked')?.value || 2),
     color: $('input[name=tpColor]:checked')?.value || 'none',
-    weeks: $$('#tpWeeks input:checked').map(i => i.value),
+    weeks: [],
+    replacesDay: false,
   };
+  if (type === 'weekly') {
+    data.weekday = Number($('#tpWeekday').value);
+    data.weeks = $$('#tpWeeks input:checked').map(i => i.value);
+  } else {
+    data.replacesDay = $('#tpReplaces').checked;
+    if (type === 'date') {
+      data.day = Number($('#tpDay').value);
+      data.month = Number($('#tpMonth').value);
+      if (!validDayMonth(data.day, data.month)) { toast('Dieses Datum gibt es nicht.'); return; }
+    } else {
+      const preset = $('#tpEasterPreset').value;
+      data.offset = Number(preset === 'custom' ? $('#tpOffset').value : preset);
+      if (!Number.isInteger(data.offset) || Math.abs(data.offset) > 200) { toast('Bitte einen Abstand in ganzen Tagen angeben.'); return; }
+    }
+  }
   const id = editingTemplateId;
   mutate(() => {
-    if (id) Object.assign(state.templates.find(x => x.id === id), data);
+    if (id) state.templates[state.templates.findIndex(x => x.id === id)] = { id, ...data };
     else state.templates.push({ id: uid(), ...data });
   }, 'Regeltermin gespeichert');
   $('#templateDialog').close();
@@ -1578,6 +1696,10 @@ function init() {
   $('#tpWeekday').innerHTML = [1, 2, 3, 4, 5, 6, 0].map(i => `<option value="${i}">${WD_LONG[i]}</option>`).join('');
   $('#tpWeeks').innerHTML = ['1', '2', '3', '4', '5', 'last'].map(w =>
     `<label><input type="checkbox" value="${w}"><span>${w === 'last' ? 'Letzte' : w + '.'}</span></label>`).join('');
+  $('#tpMonth').innerHTML = MONTHS.map((name, i) => `<option value="${i + 1}">${name}</option>`).join('');
+  $('#tpEasterPreset').innerHTML = EASTER_PRESETS.map(([o, name]) =>
+    `<option value="${o}">${name} (${o === 0 ? 'Ostern' : `Ostern ${o < 0 ? '−' : '+'}${Math.abs(o)}`})</option>`).join('') +
+    '<option value="custom">anderer Abstand …</option>';
   $('#quickChips').innerHTML = QUICK_EVENTS.map((q, i) =>
     `<button type="button" class="chip" data-quick="${i}"><i style="background:${colorBg(q.color)}"></i>${esc(q.title)}</button>`).join('');
 
@@ -1859,6 +1981,11 @@ function init() {
 
   // Regeltermin-Dialog
   $('#templateForm').addEventListener('submit', saveTemplateDialog);
+  $$('input[name=tpType]').forEach(i => i.addEventListener('change', refreshTemplateFields));
+  $('#tpEasterPreset').addEventListener('change', e => {
+    if (e.target.value !== 'custom') $('#tpOffset').value = e.target.value;
+    refreshTemplateFields();
+  });
   $('#tpDelete').addEventListener('click', () => {
     const id = editingTemplateId;
     mutate(() => { state.templates = state.templates.filter(t => t.id !== id); }, 'Regeltermin gelöscht');
