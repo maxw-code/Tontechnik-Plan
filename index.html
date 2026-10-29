@@ -6,6 +6,16 @@
   <title>Tontechnikplan</title>
   <meta name="description" content="Technikerdienst-Plan erstellen, besetzen und drucken">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M9 7v18M16 7v18M23 7v18' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Crect x='6' y='17' width='6' height='4' rx='1' fill='%23fff'/%3E%3Crect x='13' y='10' width='6' height='4' rx='1' fill='%23fff'/%3E%3Crect x='20' y='14' width='6' height='4' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+  <script>
+    // Light / Dark Mode vor dem ersten Zeichnen setzen, damit die Seite nicht weiß aufblitzt
+    (function () {
+      var t = {};
+      try { t = JSON.parse(localStorage.getItem('tontechnikplan:theme') || '{}') || {}; } catch (err) { /* ignorieren */ }
+      var dark = t.mode === 'dark' || (t.mode !== 'light' && !!window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.dataset.sheet = t.sheet === 'dark' ? 'dark' : 'light';
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="mode-view">
@@ -28,6 +38,18 @@
       <button type="button" class="btn" id="printBtn">Drucken / PDF</button>
       <button type="button" class="btn btn-primary view-only" id="enterEdit">✎ Bearbeiten</button>
       <button type="button" class="btn btn-primary edit-only" id="leaveEdit">✓ Fertig</button>
+      <details class="menu theme-menu">
+        <summary class="btn btn-ghost theme-btn" title="Darstellung" aria-label="Darstellung">◐</summary>
+        <div class="menu-pop theme-pop">
+          <p class="menu-label">Darstellung</p>
+          <div class="seg" role="radiogroup" aria-label="Darstellung">
+            <label><input type="radio" name="themeMode" value="auto"><span>Automatisch</span></label>
+            <label><input type="radio" name="themeMode" value="light"><span>Light</span></label>
+            <label><input type="radio" name="themeMode" value="dark"><span>Dark</span></label>
+          </div>
+          <label class="check"><input type="checkbox" id="themeSheetLight"> <span>Plan im Dark Mode hell lassen (wie Ausdruck)</span></label>
+        </div>
+      </details>
     </div>
   </header>
 

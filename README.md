@@ -39,6 +39,8 @@ HTTPS wird dringend empfohlen (z. B. mit Let's Encrypt), da das Passwort übertr
 - **📅 Dienste im Handy-Kalender abonnieren** → alle eigenen Dienste erscheinen im Kalender des Handys, inkl. Erinnerung; Änderungen kommen automatisch nach.
 - **Plan als Text**: ganzen Monat als Text kopieren, z. B. um einen neuen Plan in die Gruppe zu schicken.
 - **Letzte Änderungen** (unter dem Plan): jede Änderung als fertiger Gruppentext mit **📋 Kopieren**.
+- **◐ Darstellung**: Automatisch (wie das Gerät), Light oder Dark Mode; im Dark Mode kann der Plan hell bleiben (wie der Ausdruck)
+  oder ebenfalls dunkel werden. Wird pro Gerät gemerkt; gedruckt wird immer hell.
 - **📊 Statistik**: Dienste pro Person für 4 Wochen / 3, 6, 12 Monate / dieses Jahr / letztes Jahr / gesamt – nach Studio, Mischpult, allein, Sonntag/Wochentag, Absagen, Verlauf pro Woche bzw. Monat.
 
 **Bearbeiten** („✎ Bearbeiten“ + Team-Passwort)

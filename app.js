@@ -8,21 +8,23 @@ const STORAGE_KEY = 'tontechnikplan:v1';
 const VIEW_KEY = 'tontechnikplan:view';
 const ME_KEY = 'tontechnikplan:me';
 const TOKEN_KEY = 'tontechnikplan:token';
+const THEME_KEY = 'tontechnikplan:theme';
 
 const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const WD_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
+// Die Farbwerte stehen in styles.css (--c-…), damit der Dark Mode sie anpassen kann
 const COLORS = [
-  { key: 'none', label: 'Weiß', bg: '#ffffff' },
-  { key: 'blau', label: 'Blau (Sonntag)', bg: '#bdd7ee' },
-  { key: 'gelb', label: 'Gelb (Russisch)', bg: '#ffd966' },
-  { key: 'orange', label: 'Orange (Hochzeit)', bg: '#f4b183' },
-  { key: 'gruen', label: 'Grün', bg: '#c6e0b4' },
-  { key: 'rosa', label: 'Rosa', bg: '#f8cbdc' },
-  { key: 'lila', label: 'Lila', bg: '#d9d2e9' },
-  { key: 'grau', label: 'Grau', bg: '#d9d9d9' },
-];
+  { key: 'none', label: 'Weiß' },
+  { key: 'blau', label: 'Blau (Sonntag)' },
+  { key: 'gelb', label: 'Gelb (Russisch)' },
+  { key: 'orange', label: 'Orange (Hochzeit)' },
+  { key: 'gruen', label: 'Grün' },
+  { key: 'rosa', label: 'Rosa' },
+  { key: 'lila', label: 'Lila' },
+  { key: 'grau', label: 'Grau' },
+].map(c => ({ ...c, bg: `var(--c-${c.key})` }));
 const colorBg = key => (COLORS.find(c => c.key === key) || COLORS[0]).bg;
 
 const QUICK_EVENTS = [
@@ -176,6 +178,31 @@ const ui = { mode: 'view', page: 'plan', me: loadMe(), pendingAction: null, edit
 
 function loadMe() {
   try { return localStorage.getItem(ME_KEY) || ''; } catch (err) { return ''; }
+}
+
+/* ---------- Darstellung (Light / Dark Mode, pro Gerät) ---------- */
+const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+const theme = loadTheme();
+
+function loadTheme() {
+  let t = {};
+  try { t = JSON.parse(localStorage.getItem(THEME_KEY) || '{}') || {}; } catch (err) { /* ignorieren */ }
+  return { mode: ['light', 'dark'].includes(t.mode) ? t.mode : 'auto', sheet: t.sheet === 'dark' ? 'dark' : 'light' };
+}
+
+function applyTheme() {
+  const dark = theme.mode === 'dark' || (theme.mode === 'auto' && !!darkQuery?.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.documentElement.dataset.sheet = theme.sheet;
+  setRadio('themeMode', theme.mode);
+  $('#themeSheetLight').checked = theme.sheet === 'light';
+  $('#themeSheetLight').disabled = !dark;
+}
+
+function setTheme(patch) {
+  Object.assign(theme, patch);
+  try { localStorage.setItem(THEME_KEY, JSON.stringify(theme)); } catch (err) { /* ignorieren */ }
+  applyTheme();
 }
 
 /* ---------- Server-Speicherung (api.php) ----------
@@ -1581,6 +1608,12 @@ function init() {
   $('#quickChips').innerHTML = QUICK_EVENTS.map((q, i) =>
     `<button type="button" class="chip" data-quick="${i}"><i style="background:${colorBg(q.color)}"></i>${esc(q.title)}</button>`).join('');
 
+  // Darstellung
+  applyTheme();
+  $$('input[name=themeMode]').forEach(i => i.addEventListener('change', () => setTheme({ mode: i.value })));
+  $('#themeSheetLight').addEventListener('change', e => setTheme({ sheet: e.target.checked ? 'light' : 'dark' }));
+  darkQuery?.addEventListener?.('change', applyTheme);
+
   // Monatsnavigation
   $('#prevMonth').addEventListener('click', () => setMonth(view.y, view.m - 1));
   $('#nextMonth').addEventListener('click', () => setMonth(view.y, view.m + 1));
@@ -1664,8 +1697,9 @@ function init() {
   });
   $('#copyText').addEventListener('click', async () => { await copyText(planAsText()); toast('Plan als Text kopiert'); });
 
-  const closeMenu = () => $('.menu').removeAttribute('open');
-  document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenu(); });
+  // Offene Menüs schließen (außer dem, in das gerade geklickt wurde)
+  const closeMenu = (keep = null) => $$('.menu[open]').forEach(m => { if (m !== keep) m.removeAttribute('open'); });
+  document.addEventListener('click', e => closeMenu(e.target.closest('.menu')));
   $('#clearPeople').addEventListener('click', () => {
     closeMenu();
     if (!confirm(`Alle Personen aus den Terminen im ${MONTHS[view.m]} entfernen? Die Termine bleiben bestehen.`)) return;
